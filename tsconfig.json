@@ -1,12 +1,57 @@
 {
-  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
     "baseUrl": ".",
     "sourceMap": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ESNext",
+    "lib": [
+      "dom",
+      "esnext.intl",
+      "es2017.intl",
+      "es2018.intl",
+      "ES2015"
+    ],
+    "declaration": true,
+    "strict": true,
+    "resolveJsonModule": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "preserveConstEnums": true,
+    "allowSyntheticDefaultImports": true,
+    "noFallthroughCasesInSwitch": true,
+    "declarationMap": true,
+    "jsx": "react",
+    "importHelpers": true,
+  
+  //   "paths": {
+  //     "@formatjs/*": [
+  //       // k8 is 64-bit GNU/Linux output location, darwin is macOS.
+  //       "bazel-out/k8-fastbuild/bin/packages/*",
+  //       "bazel-out/darwin-fastbuild/bin/packages/*"
+  //     ],
+  //     "intl-messageformat": [
+  //       "bazel-out/k8-fastbuild/bin/packages/intl-messageformat",
+  //       "bazel-out/darwin-fastbuild/bin/packages/intl-messageformat"
+  //     ],
+  //     "babel-plugin-formatjs": [
+  //       "bazel-out/k8-fastbuild/bin/packages/babel-plugin-formatjs",
+  //       "bazel-out/darwin-fastbuild/bin/packages/babel-plugin-formatjs"
+  //     ],
+  //     "eslint-plugin-formatjs": [
+  //       "bazel-out/k8-fastbuild/bin/packages/eslint-plugin-formatjs",
+  //       "bazel-out/darwin-fastbuild/bin/packages/eslint-plugin-formatjs"
+  //     ],
+  //     "intl-messageformat-parser": [
+  //       "bazel-out/k8-fastbuild/bin/packages/intl-messageformat-parser",
+  //       "bazel-out/darwin-fastbuild/bin/packages/intl-messageformat-parser"
+  //     ]
+  //   }
+  // },
   },
   "include": ["src", "src/**/*.json"],
-  "references": [{"path": "../intl-messageformat-parser"}]
+  // "references": [{"path": "../intl-messageformat-parser"}]
 }

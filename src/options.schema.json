@@ -2,17 +2,17 @@
   "type": "object",
   "properties": {
     "moduleSourceName": {"type": "string"},
-    "extractSourceLocation": {"type": "boolean"},
-    "messagesDir": {"type": "string"},
     "overrideIdFn": {
       "instanceof": "Function",
-      "tsType": "(id: string, defaultMessage: string, description: string, filePath: string) => string"
+      "tsType": "(id?: string, defaultMessage?: string, description?: string, filePath?: string, partners?: string) => string"
     },
+    "idInterpolationPattern": {"type": "string"},
     "removeDefaultMessage": {"type": "boolean"},
-    "extractFromFormatMessageCall": {"type": "boolean"},
     "additionalComponentNames": {"type": "array", "items": {"type": "string"}},
-    "outputEmptyJson": {"type": "boolean"},
-    "pragma": {"type": "string"}
+    "pragma": {"type": "string"},
+    "extractFromFormatMessageCall": {"type": "boolean"},
+    "extractSourceLocation": {"type": "boolean"},
+    "ast": {"type": "boolean"}
   },
   "additionalProperties": false
 }
