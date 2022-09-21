@@ -1,31 +1,14 @@
-import { parse } from "intl-messageformat-parser";
-import { declare } from "@babel/helper-plugin-utils";
-import { PluginObj, types as t } from "@babel/core";
-
-import {
-  ObjectExpression,
-  JSXAttribute,
-  StringLiteral,
-  JSXIdentifier,
-  JSXExpressionContainer,
-  Identifier,
-  ObjectProperty,
-  SourceLocation,
-  Expression,
-  V8IntrinsicIdentifier,
-  isTSAsExpression,
-  isTypeCastExpression,
-  isTSTypeAssertion,
-  TemplateLiteral,
-} from "@babel/types";
-import { NodePath, Scope } from "@babel/traverse";
-import { validate } from "schema-utils";
-import * as OPTIONS_SCHEMA from "./options.schema.json";
-import { OptionsSchema } from "./options";
-import { interpolateName } from "@formatjs/ts-transformer";
-
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const tslib_1 = require("tslib");
+const intl_messageformat_parser_1 = require("intl-messageformat-parser");
+const helper_plugin_utils_1 = require("@babel/helper-plugin-utils");
+const core_1 = require("@babel/core");
+const types_1 = require("@babel/types");
+const schema_utils_1 = require("schema-utils");
+const OPTIONS_SCHEMA = tslib_1.__importStar(require("./options.schema.json"));
+const ts_transformer_1 = require("@formatjs/ts-transformer");
 const DEFAULT_COMPONENT_NAMES = ["FormattedMessage"];
-
 const EXTRACTED = Symbol("ReactIntlExtracted");
 const DESCRIPTOR_PROPS = new Set([
   "id",
@@ -34,82 +17,15 @@ const DESCRIPTOR_PROPS = new Set([
   "partners",
   "partnerVariations",
 ]);
-
-interface PartnerVariation {
-  [key: string]: string;
-}
-
-interface MessageDescriptor {
-  id: string;
-  defaultMessage?: string;
-  description?: string;
-  partners?: string;
-  partnerVariations?: PartnerVariation;
-}
-
-export type ExtractedMessageDescriptor = MessageDescriptor &
-  Partial<SourceLocation> & { file?: string };
-
-export type ExtractionResult<M = Record<string, string>> = {
-  messages: ExtractedMessageDescriptor[];
-  meta: M;
-};
-
-type MessageDescriptorPath = Record<
-  keyof MessageDescriptor,
-  NodePath<StringLiteral> | undefined
->;
-
-// From https://github.com/babel/babel/blob/master/packages/babel-core/src/transformation/plugin-pass.js
-interface PluginPass<O> {
-  key?: string;
-  file: BabelTransformationFile;
-  opts: O;
-  cwd: string;
-  filename?: string;
-}
-
-interface BabelTransformationFile {
-  opts: {
-    filename: string;
-    babelrc: boolean;
-    configFile: boolean;
-    passPerPreset?: boolean;
-    envName: string;
-    cwd: string;
-    root: string;
-    plugins: unknown[];
-    presets?: unknown[];
-    parserOpts: object;
-    generatorOpts: object;
-  };
-  declarations?: {};
-  path: NodePath | null;
-  ast: {};
-  scope: unknown;
-  metadata: {};
-  code: string;
-  inputMap: object | null;
-}
-
-interface State {
-  ReactIntlMessages: Map<string, ExtractedMessageDescriptor>;
-  ReactIntlMeta: Record<string, string>;
-}
-
-function getICUMessageValue(
-  messagePath?: NodePath<StringLiteral> | NodePath<TemplateLiteral>,
-  { isJSXSource = false } = {}
-) {
+function getICUMessageValue(messagePath, { isJSXSource = false } = {}) {
   if (!messagePath) {
     return "";
   }
   const message = getMessageDescriptorValue(messagePath)
     .trim()
     .replace(/\s+/gm, " ");
-
   try {
-    parse(message);
+    (0, intl_messageformat_parser_1.parse)(message);
   } catch (parseError) {
     if (
       isJSXSource &&
@@ -124,7 +40,6 @@ function getICUMessageValue(
           "See: http://facebook.github.io/react/docs/jsx-gotchas.html"
       );
     }
-
     throw messagePath.buildCodeFrameError(
       "[React Intl] Message failed to parse. " +
         "See: https://formatjs.io/docs/core-concepts/icu-syntax" +
@@ -133,59 +48,39 @@ function getICUMessageValue(
   }
   return message;
 }
-
-function evaluatePath(path: NodePath<any>): string {
+function evaluatePath(path) {
   const evaluated = path.evaluate();
   if (evaluated.confident) {
     return evaluated.value;
   }
-
   throw path.buildCodeFrameError(
     "[React Intl] Messages must be statically evaluate-able for extraction."
   );
 }
-
-function getMessageDescriptorKey(path: NodePath<any>) {
+function getMessageDescriptorKey(path) {
   if (path.isIdentifier() || path.isJSXIdentifier()) {
     return path.node.name;
   }
-
   return evaluatePath(path);
 }
-
-function getMessageDescriptorValue(
-  path?:
-    | NodePath<StringLiteral>
-    | NodePath<JSXExpressionContainer>
-    | NodePath<TemplateLiteral>
-) {
+function getMessageDescriptorValue(path) {
   if (!path) {
     return "";
   }
   if (path.isJSXExpressionContainer()) {
-    path = path.get("expression") as NodePath<StringLiteral>;
+    path = path.get("expression");
   }
-
   // Always trim the Message Descriptor values.
   const descriptorValue = evaluatePath(path);
-
   return descriptorValue;
 }
-
-function createMessageDescriptor(
-  propPaths: [
-    NodePath<JSXIdentifier> | NodePath<Identifier>,
-    NodePath<StringLiteral> | NodePath<JSXExpressionContainer>
-  ][]
-): MessageDescriptorPath {
+function createMessageDescriptor(propPaths) {
   return propPaths.reduce(
-    (hash: MessageDescriptorPath, [keyPath, valuePath]) => {
+    (hash, [keyPath, valuePath]) => {
       const key = getMessageDescriptorKey(keyPath);
-
       if (DESCRIPTOR_PROPS.has(key)) {
-        hash[key as "id"] = valuePath as NodePath<StringLiteral>;
+        hash[key] = valuePath;
       }
-
       return hash;
     },
     {
@@ -197,13 +92,12 @@ function createMessageDescriptor(
     }
   );
 }
-
 function evaluateMessageDescriptor(
-  descriptorPath: MessageDescriptorPath,
+  descriptorPath,
   isJSXSource = false,
-  filename: string,
+  filename,
   idInterpolationPattern = "[contenthash:5]",
-  overrideIdFn?: OptionsSchema["overrideIdFn"]
+  overrideIdFn
 ) {
   let id = getMessageDescriptorValue(descriptorPath.id);
   const defaultMessage = getICUMessageValue(descriptorPath.defaultMessage, {
@@ -214,12 +108,11 @@ function evaluateMessageDescriptor(
   const partnerVariations = getMessageDescriptorValue(
     descriptorPath.partnerVariations
   );
-
   if (overrideIdFn) {
     id = overrideIdFn(id, defaultMessage, description, filename);
   } else if (!id && idInterpolationPattern && defaultMessage) {
-    id = interpolateName(
-      { resourcePath: filename } as any,
+    id = (0, ts_transformer_1.interpolateName)(
+      { resourcePath: filename },
       idInterpolationPattern,
       {
         content: description
@@ -228,10 +121,9 @@ function evaluateMessageDescriptor(
       }
     );
   }
-  const descriptor: MessageDescriptor = {
+  const descriptor = {
     id,
   };
-
   if (description) {
     descriptor.description = description;
   }
@@ -245,36 +137,27 @@ function evaluateMessageDescriptor(
     // @ts-expect-error
     descriptor.partnerVariations = partnerVariations;
   }
-
   return descriptor;
 }
-
 function storeMessage(
-  {
-    id,
-    description,
-    defaultMessage,
-    partners,
-    partnerVariations,
-  }: MessageDescriptor,
-  path: NodePath<any>,
-  { extractSourceLocation }: OptionsSchema,
-
-  filename: string,
-  messages: Map<string, ExtractedMessageDescriptor>
+  { id, description, defaultMessage, partners, partnerVariations },
+  path,
+  { extractSourceLocation },
+  filename,
+  messages
 ) {
   if (!id && !defaultMessage) {
     throw path.buildCodeFrameError(
       "[React Intl] Message Descriptors require an `id` or `defaultMessage`."
     );
   }
-
   if (messages.has(id)) {
     const existing = messages.get(id);
-
     if (
-      description !== existing!.description ||
-      defaultMessage !== existing!.defaultMessage
+      description !== existing.description ||
+      defaultMessage !== existing.defaultMessage ||
+      partners !== existing.partners ||
+      partnerVariations !== existing.partnerVariations
     ) {
       throw path.buildCodeFrameError(
         `[React Intl] Duplicate message id: "${id}", ` +
@@ -282,7 +165,6 @@ function storeMessage(
       );
     }
   }
-
   let loc = {};
   if (extractSourceLocation) {
     loc = {
@@ -290,7 +172,6 @@ function storeMessage(
       ...path.node.loc,
     };
   }
-
   messages.set(id, {
     id,
     description,
@@ -300,55 +181,42 @@ function storeMessage(
     ...loc,
   });
 }
-
-function referencesImport(
-  path: NodePath<any>,
-  mod: string,
-  importedNames: string[]
-) {
+function referencesImport(path, mod, importedNames) {
   if (!(path.isIdentifier() || path.isJSXIdentifier())) {
     return false;
   }
-
   return importedNames.some((name) => path.referencesImport(mod, name));
 }
-
-function isFormatMessageDestructuring(scope: Scope) {
+function isFormatMessageDestructuring(scope) {
   const binding = scope.getBinding("formatMessage");
   const { block } = scope;
   const declNode = binding?.path.node;
   // things like `const {formatMessage} = intl; formatMessage(...)`
-  if (t.isVariableDeclarator(declNode)) {
+  if (core_1.types.isVariableDeclarator(declNode)) {
     // things like `const {formatMessage} = useIntl(); formatMessage(...)`
-    if (t.isCallExpression(declNode.init)) {
-      if (t.isIdentifier(declNode.init.callee)) {
+    if (core_1.types.isCallExpression(declNode.init)) {
+      if (core_1.types.isIdentifier(declNode.init.callee)) {
         return declNode.init.callee.name === "useIntl";
       }
     }
     return (
-      t.isObjectPattern(declNode.id) &&
-      declNode.id.properties.find((value: any) => value.key.name === "intl")
+      core_1.types.isObjectPattern(declNode.id) &&
+      declNode.id.properties.find((value) => value.key.name === "intl")
     );
   }
-
   // things like const fn = ({ intl: { formatMessage }}) => { formatMessage(...) }
   if (
-    t.isFunctionDeclaration(block) &&
+    core_1.types.isFunctionDeclaration(block) &&
     block.params.length &&
-    t.isObjectPattern(block.params[0])
+    core_1.types.isObjectPattern(block.params[0])
   ) {
     return block.params[0].properties.find(
-      (value: any) => value.key.name === "intl"
+      (value) => value.key.name === "intl"
     );
   }
-
   return false;
 }
-
-function isFormatMessageCall(
-  callee: NodePath<Expression | V8IntrinsicIdentifier>,
-  path: NodePath<any>
-) {
+function isFormatMessageCall(callee, path) {
   if (
     callee.isIdentifier() &&
     callee.node.name === "formatMessage" &&
@@ -356,14 +224,11 @@ function isFormatMessageCall(
   ) {
     return true;
   }
-
   if (!callee.isMemberExpression()) {
     return false;
   }
-
   const object = callee.get("object");
-  const property = callee.get("property") as NodePath<Identifier>;
-
+  const property = callee.get("property");
   return (
     property.isIdentifier() &&
     property.node.name === "formatMessage" &&
@@ -372,19 +237,13 @@ function isFormatMessageCall(
     ((object.isIdentifier() && object.node.name === "intl") ||
       // things like `this.props.intl.formatMessage`
       (object.isMemberExpression() &&
-        (object.get("property") as NodePath<Identifier>).node.name === "intl"))
+        object.get("property").node.name === "intl"))
   );
 }
-
-function assertObjectExpression(
-  path: NodePath<any>,
-  callee: NodePath<Expression | V8IntrinsicIdentifier>
-): path is NodePath<ObjectExpression> {
+function assertObjectExpression(path, callee) {
   if (!path || !path.isObjectExpression()) {
     throw path.buildCodeFrameError(
-      `[React Intl] \`${
-        (callee.get("property") as NodePath<Identifier>).node.name
-      }()\` must be ` +
+      `[React Intl] \`${callee.get("property").node.name}()\` must be ` +
         "called with an object expression with values " +
         "that are React Intl Message Descriptors, also " +
         "defined as object expressions."
@@ -392,16 +251,13 @@ function assertObjectExpression(
   }
   return true;
 }
-
-export default declare((api: any, options: OptionsSchema) => {
+exports.default = (0, helper_plugin_utils_1.declare)((api, options) => {
   api.assertVersion(7);
-
-  validate(OPTIONS_SCHEMA as any, options, {
+  (0, schema_utils_1.validate)(OPTIONS_SCHEMA, options, {
     name: "babel-plugin-formatjs",
     baseDataPath: "options",
   });
   const { pragma } = options;
-
   /**
    * Store this in the node itself so that multiple passes work. Specifically
    * if we remove `description` in the 1st pass, 2nd pass will fail since
@@ -409,11 +265,10 @@ export default declare((api: any, options: OptionsSchema) => {
    * HACK: We store this in the node instance since this persists across
    * multiple plugin runs
    */
-  function tagAsExtracted(path: NodePath<any>) {
+  function tagAsExtracted(path) {
     path.node[EXTRACTED] = true;
   }
-
-  function wasExtracted(path: NodePath<any>) {
+  function wasExtracted(path) {
     return !!path.node[EXTRACTED];
   }
   return {
@@ -423,16 +278,14 @@ export default declare((api: any, options: OptionsSchema) => {
         this.ReactIntlMeta = {};
       }
     },
-
     post(state) {
       const { ReactIntlMessages: messages, ReactIntlMeta } = this;
       const descriptors = Array.from(messages.values());
-      (state as any).metadata["react-intl"] = {
+      state.metadata["react-intl"] = {
         messages: descriptors,
         meta: ReactIntlMeta,
-      } as ExtractionResult;
+      };
     },
-
     visitor: {
       Program(path) {
         const { body } = path.node;
@@ -450,7 +303,6 @@ export default declare((api: any, options: OptionsSchema) => {
           if (!pragmaLineNode) {
             continue;
           }
-
           pragmaLineNode.value
             .split(pragma)[1]
             .trim()
@@ -481,9 +333,7 @@ export default declare((api: any, options: OptionsSchema) => {
         if (wasExtracted(path)) {
           return;
         }
-
         const name = path.get("name");
-
         if (name.referencesImport(moduleSourceName, "FormattedPlural")) {
           if (path.node && path.node.loc)
             console.warn(
@@ -491,30 +341,19 @@ export default declare((api: any, options: OptionsSchema) => {
                 "Default messages are not extracted from " +
                 "<FormattedPlural>, use <FormattedMessage> instead."
             );
-
           return;
         }
-
         if (
           name.isJSXIdentifier() &&
-          (referencesImport(
-            name as NodePath<any>,
-            moduleSourceName,
-            DEFAULT_COMPONENT_NAMES
-          ) ||
+          (referencesImport(name, moduleSourceName, DEFAULT_COMPONENT_NAMES) ||
             additionalComponentNames.includes(name.node.name))
         ) {
           const attributes = path
             .get("attributes")
             .filter((attr) => attr.isJSXAttribute());
-
           const descriptorPath = createMessageDescriptor(
-            attributes.map((attr) => [
-              attr.get("name") as NodePath<JSXIdentifier>,
-              attr.get("value") as NodePath<StringLiteral>,
-            ])
+            attributes.map((attr) => [attr.get("name"), attr.get("value")])
           );
-
           // In order for a default message to be extracted when
           // declaring a JSX element, it must be done with standard
           // `key=value` attributes. But it's completely valid to
@@ -531,7 +370,6 @@ export default declare((api: any, options: OptionsSchema) => {
               idInterpolationPattern,
               overrideIdFn
             );
-
             storeMessage(
               descriptor,
               path,
@@ -539,21 +377,14 @@ export default declare((api: any, options: OptionsSchema) => {
               filename,
               this.ReactIntlMessages
             );
-
-            let idAttr: NodePath<t.JSXAttribute> | undefined;
-            let descriptionAttr: NodePath<t.JSXAttribute> | undefined;
-            let defaultMessageAttr: NodePath<t.JSXAttribute> | undefined;
-            let partnersAttr: NodePath<t.JSXAttribute> | undefined;
-            let partnerVariationsAttr: NodePath<t.JSXAttribute> | undefined;
+            let idAttr;
+            let descriptionAttr;
+            let defaultMessageAttr;
             for (const attr of attributes) {
               if (!attr.isJSXAttribute()) {
                 continue;
               }
-              switch (
-                getMessageDescriptorKey(
-                  (attr as NodePath<JSXAttribute>).get("name")
-                )
-              ) {
+              switch (getMessageDescriptorKey(attr.get("name"))) {
                 case "description":
                   descriptionAttr = attr;
                   break;
@@ -563,25 +394,11 @@ export default declare((api: any, options: OptionsSchema) => {
                 case "id":
                   idAttr = attr;
                   break;
-                case "partners":
-                  partnersAttr = attr;
-                  break;
-                case "partnerVariations":
-                  partnerVariationsAttr = attr;
-                  break;
               }
             }
-
             if (descriptionAttr) {
               descriptionAttr.remove();
             }
-            if (partnersAttr) {
-              partnersAttr.remove();
-            }
-            if (partnerVariationsAttr) {
-              partnerVariationsAttr.remove();
-            }
-
             if (
               !removeDefaultMessage &&
               ast &&
@@ -590,39 +407,44 @@ export default declare((api: any, options: OptionsSchema) => {
             ) {
               defaultMessageAttr
                 .get("value")
-                .replaceWith(t.jsxExpressionContainer(t.stringLiteral("foo")));
-              (defaultMessageAttr.get("value") as NodePath<
-                JSXExpressionContainer
-              >)
+                .replaceWith(
+                  core_1.types.jsxExpressionContainer(
+                    core_1.types.stringLiteral("foo")
+                  )
+                );
+              defaultMessageAttr
+                .get("value")
                 .get("expression")
                 .replaceWithSourceString(
-                  JSON.stringify(parse(descriptor.defaultMessage))
+                  JSON.stringify(
+                    (0, intl_messageformat_parser_1.parse)(
+                      descriptor.defaultMessage
+                    )
+                  )
                 );
             }
-
             if (overrideIdFn || (descriptor.id && idInterpolationPattern)) {
               if (idAttr) {
-                idAttr.get("value").replaceWith(t.stringLiteral(descriptor.id));
+                idAttr
+                  .get("value")
+                  .replaceWith(core_1.types.stringLiteral(descriptor.id));
               } else if (defaultMessageAttr) {
                 defaultMessageAttr.insertBefore(
-                  t.jsxAttribute(
-                    t.jsxIdentifier("id"),
-                    t.stringLiteral(descriptor.id)
+                  core_1.types.jsxAttribute(
+                    core_1.types.jsxIdentifier("id"),
+                    core_1.types.stringLiteral(descriptor.id)
                   )
                 );
               }
             }
-
             if (removeDefaultMessage && defaultMessageAttr) {
               defaultMessageAttr.remove();
             }
-
             // Tag the AST node so we don't try to extract it twice.
             tagAsExtracted(path);
           }
         }
       },
-
       CallExpression(
         path,
         {
@@ -642,34 +464,19 @@ export default declare((api: any, options: OptionsSchema) => {
           ast,
         } = opts;
         const callee = path.get("callee");
-
         /**
          * Process MessageDescriptor
          * @param messageDescriptor Message Descriptor
          */
-        function processMessageObject(
-          messageDescriptor: NodePath<ObjectExpression>
-        ) {
+        function processMessageObject(messageDescriptor) {
           assertObjectExpression(messageDescriptor, callee);
-
           if (wasExtracted(messageDescriptor)) {
             return;
           }
-
-          const properties = messageDescriptor.get("properties") as NodePath<
-            ObjectProperty
-          >[];
-
+          const properties = messageDescriptor.get("properties");
           const descriptorPath = createMessageDescriptor(
-            properties.map(
-              (prop) =>
-                [prop.get("key"), prop.get("value")] as [
-                  NodePath<Identifier>,
-                  NodePath<StringLiteral>
-                ]
-            )
+            properties.map((prop) => [prop.get("key"), prop.get("value")])
           );
-
           // Evaluate the Message Descriptor values, then store it.
           const descriptor = evaluateMessageDescriptor(
             descriptorPath,
@@ -679,7 +486,6 @@ export default declare((api: any, options: OptionsSchema) => {
             overrideIdFn
           );
           storeMessage(descriptor, messageDescriptor, opts, filename, messages);
-
           // Remove description since it's not used at runtime.
           messageDescriptor.replaceWithSourceString(
             JSON.stringify({
@@ -687,17 +493,17 @@ export default declare((api: any, options: OptionsSchema) => {
               ...(!removeDefaultMessage && descriptor.defaultMessage
                 ? {
                     defaultMessage: ast
-                      ? parse(descriptor.defaultMessage)
+                      ? (0, intl_messageformat_parser_1.parse)(
+                          descriptor.defaultMessage
+                        )
                       : descriptor.defaultMessage,
                   }
                 : {}),
             })
           );
-
           // Tag the AST node so we don't try to extract it twice.
           tagAsExtracted(messageDescriptor);
         }
-
         // Check that this is `defineMessages` call
         if (
           isMultipleMessagesDeclMacro(callee, moduleSourceName) ||
@@ -705,23 +511,19 @@ export default declare((api: any, options: OptionsSchema) => {
         ) {
           const firstArgument = path.get("arguments")[0];
           const messagesObj = getMessagesObjectFromExpression(firstArgument);
-
           if (assertObjectExpression(messagesObj, callee)) {
             if (isSingularMessagesDeclMacro(callee, moduleSourceName)) {
-              processMessageObject(messagesObj as NodePath<ObjectExpression>);
+              processMessageObject(messagesObj);
             } else {
               const properties = messagesObj.get("properties");
               if (Array.isArray(properties)) {
                 properties
-                  .map(
-                    (prop) => prop.get("value") as NodePath<ObjectExpression>
-                  )
+                  .map((prop) => prop.get("value"))
                   .forEach(processMessageObject);
               }
             }
           }
         }
-
         // Check that this is `intl.formatMessage` call
         if (extractFromFormatMessageCall && isFormatMessageCall(callee, path)) {
           const messageDescriptor = path.get("arguments")[0];
@@ -731,34 +533,23 @@ export default declare((api: any, options: OptionsSchema) => {
         }
       },
     },
-  } as PluginObj<PluginPass<OptionsSchema> & State>;
+  };
 });
-
-function isMultipleMessagesDeclMacro(
-  callee: NodePath<any>,
-  moduleSourceName: string
-) {
+function isMultipleMessagesDeclMacro(callee, moduleSourceName) {
   return referencesImport(callee, moduleSourceName, ["defineMessages"]);
 }
-
-function isSingularMessagesDeclMacro(
-  callee: NodePath<any>,
-  moduleSourceName: string
-) {
+function isSingularMessagesDeclMacro(callee, moduleSourceName) {
   return referencesImport(callee, moduleSourceName, ["defineMessage"]);
 }
-
-function getMessagesObjectFromExpression(
-  nodePath: NodePath<any>
-): NodePath<any> {
+function getMessagesObjectFromExpression(nodePath) {
   let currentPath = nodePath;
   while (
-    isTSAsExpression(currentPath.node) ||
-    isTSTypeAssertion(currentPath.node) ||
-    isTypeCastExpression(currentPath.node)
+    (0, types_1.isTSAsExpression)(currentPath.node) ||
+    (0, types_1.isTSTypeAssertion)(currentPath.node) ||
+    (0, types_1.isTypeCastExpression)(currentPath.node)
   ) {
-    currentPath = currentPath.get("expression") as NodePath<any>;
+    currentPath = currentPath.get("expression");
   }
   return currentPath;
 }
-export { OptionsSchema } from "./options";
+//# sourceMappingURL=index.js.map
