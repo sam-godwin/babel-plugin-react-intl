@@ -274,9 +274,7 @@ function storeMessage(
 
     if (
       description !== existing!.description ||
-      defaultMessage !== existing!.defaultMessage ||
-      partners !== existing!.partners ||
-      partnerVariations !== existing!.partnerVariations
+      defaultMessage !== existing!.defaultMessage
     ) {
       throw path.buildCodeFrameError(
         `[React Intl] Duplicate message id: "${id}", ` +
@@ -545,6 +543,8 @@ export default declare((api: any, options: OptionsSchema) => {
             let idAttr: NodePath<t.JSXAttribute> | undefined;
             let descriptionAttr: NodePath<t.JSXAttribute> | undefined;
             let defaultMessageAttr: NodePath<t.JSXAttribute> | undefined;
+            let partnersAttr: NodePath<t.JSXAttribute> | undefined;
+            let partnerVariationsAttr: NodePath<t.JSXAttribute> | undefined;
             for (const attr of attributes) {
               if (!attr.isJSXAttribute()) {
                 continue;
@@ -563,11 +563,23 @@ export default declare((api: any, options: OptionsSchema) => {
                 case "id":
                   idAttr = attr;
                   break;
+                case "partners":
+                  partnersAttr = attr;
+                  break;
+                case "partnerVariations":
+                  partnerVariationsAttr = attr;
+                  break;
               }
             }
 
             if (descriptionAttr) {
               descriptionAttr.remove();
+            }
+            if (partnersAttr) {
+              partnersAttr.remove();
+            }
+            if (partnerVariationsAttr) {
+              partnerVariationsAttr.remove();
             }
 
             if (
