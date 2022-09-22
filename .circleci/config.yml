@@ -1,0 +1,82 @@
+version: 2.1
+
+orbs:
+  web-platform-ci-orbs: babylonhealth/web-platform-ci-orbs@0.0
+
+commands:
+  init:
+    description: Initial setup
+    steps:
+      - checkout
+
+jobs:
+  lint:
+    docker:
+      - image: cimg/node:14.17
+    steps:
+      - init
+      - web-platform-ci-orbs/configure-artifactory
+      - web-platform-ci-orbs/install-dependencies
+      - web-platform-ci-orbs/lint
+  prettier:
+    docker:
+      - image: cimg/node:14.17
+    steps:
+      - init
+      - web-platform-ci-orbs/configure-artifactory
+      - web-platform-ci-orbs/install-dependencies
+      - web-platform-ci-orbs/prettier
+  build:
+    docker:
+      - image: cimg/node:14.17
+    steps:
+      - init
+      - web-platform-ci-orbs/configure-artifactory
+      - web-platform-ci-orbs/install-dependencies
+      - web-platform-ci-orbs/build
+  publish:
+    docker:
+      - image: cimg/node:14.17
+    steps:
+      - init
+      - web-platform-ci-orbs/configure-artifactory
+      - web-platform-ci-orbs/install-dependencies
+      - web-platform-ci-orbs/build
+      - web-platform-ci-orbs/publish-artifactory
+      - web-platform-ci-orbs/trigger-deploy:
+          regions: "global"
+
+workflows:
+  version: 2
+  main:
+    jobs:
+      - lint:
+          context: babylon
+          filters:
+            tags:
+              only: /^v.*/
+      - prettier:
+          context: babylon
+          filters:
+            tags:
+              only: /^v.*/
+      - build:
+          context: babylon
+          filters:
+            tags:
+              only: /^v.*/
+      - publish:
+          context: babylon
+          filters:
+            branches:
+              only:
+                - main
+            tags:
+              only: /^v.*/
+Footer
+© 2022 GitHub, Inc.
+Footer navigation
+Terms
+Privacy
+Security
+Status
